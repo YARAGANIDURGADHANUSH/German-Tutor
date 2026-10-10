@@ -1,0 +1,373 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sprechstunde: speak German out loud</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,600;12..96,700&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --paper:#E6EAEF; --panel:#F5F7F9; --ink:#16202B; --slate:#566475; --line:#C3CCD6;
+  --signal:#D8352A; --gold:#EFB400; --ok:#2E7D5B;
+  --ui:"Bricolage Grotesque",system-ui,sans-serif;
+  --text:"Source Serif 4",Georgia,serif;
+  --lvl:0;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--ui)}
+body{min-height:100vh;display:grid;grid-template-columns:minmax(0,1fr) 380px}
+button,select,input{font:inherit;color:inherit}
+:focus-visible{outline:3px solid var(--ink);outline-offset:2px}
+
+.stage{padding:40px clamp(20px,5vw,64px);display:flex;flex-direction:column;gap:28px;min-height:100vh}
+h1{margin:0;font-size:clamp(34px,5vw,56px);line-height:1;font-weight:700;letter-spacing:-.02em}
+.tag{margin:8px 0 0;color:var(--slate);max-width:44ch}
+
+.controls{display:flex;flex-wrap:wrap;gap:18px 28px;align-items:end}
+.field{display:flex;flex-direction:column;gap:6px;font-size:14px;color:var(--slate)}
+.seg{display:flex;border:2px solid var(--ink);border-radius:999px;overflow:hidden}
+.seg button{background:transparent;border:0;padding:8px 16px;cursor:pointer;font-weight:600}
+.seg button[aria-pressed=true]{background:var(--ink);color:var(--paper)}
+select{background:var(--panel);border:2px solid var(--ink);border-radius:10px;padding:8px 10px}
+input[type=range]{accent-color:var(--ink);width:120px}
+.go{background:var(--ink);color:var(--paper);border:0;border-radius:999px;padding:12px 28px;font-weight:700;cursor:pointer;font-size:17px}
+.go[data-live=true]{background:var(--signal)}
+
+.orbwrap{display:flex;align-items:center;gap:36px;flex-wrap:wrap}
+.orb{width:200px;height:200px;border-radius:50%;flex:none;position:relative;background:var(--panel);border:3px solid var(--ink);transition:background .25s,transform .08s}
+.orb::after{content:"";position:absolute;inset:-16px;border-radius:50%;border:2px dashed transparent}
+.orb[data-mode=listening]{background:var(--signal);border-color:var(--signal);transform:scale(calc(1 + var(--lvl)*.18))}
+.orb[data-mode=thinking]::after{border-color:var(--ink);animation:spin 5s linear infinite}
+.orb[data-mode=speaking]{background:var(--gold);border-color:var(--gold);animation:breathe 1.3s ease-in-out infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+@keyframes breathe{50%{transform:scale(1.07)}}
+@media (prefers-reduced-motion:reduce){.orb,.orb::after{animation:none!important;transition:none}}
+.status{font-size:18px;font-weight:600;min-height:1.4em}
+.sub{color:var(--slate);font-size:15px;margin-top:4px}
+
+.caption{margin-top:auto;border-left:6px solid var(--ink);padding:4px 0 4px 22px}
+.caption .say{font-family:var(--text);font-size:clamp(26px,3.4vw,40px);line-height:1.25;max-width:30em;min-height:2.5em;margin:0}
+.caption .you{margin:12px 0 0;color:var(--slate);font-size:16px}
+
+aside{background:var(--panel);border-left:2px solid var(--line);padding:28px 22px;display:flex;flex-direction:column;gap:22px;max-height:100vh;overflow:auto;position:sticky;top:0}
+aside h2{margin:0 0 8px;font-size:17px}
+.log{display:flex;flex-direction:column;gap:10px;max-height:34vh;overflow:auto;padding-right:4px}
+.msg{font-family:var(--text);font-size:16px;line-height:1.4;padding:8px 12px;border-radius:12px;max-width:92%}
+.msg.tutor{background:#FBE7A4;align-self:flex-start}
+.msg.you{background:var(--paper);align-self:flex-end}
+.empty{color:var(--slate);font-size:15px}
+form.type{display:flex;gap:8px}
+form.type input{flex:1;background:var(--paper);border:2px solid var(--line);border-radius:10px;padding:9px 11px}
+form.type button{background:var(--ink);color:var(--paper);border:0;border-radius:10px;padding:0 14px;cursor:pointer;font-weight:600}
+.card{border:2px solid var(--line);border-radius:12px;padding:12px 14px;background:var(--paper);font-size:15px}
+.card b{font-size:22px}
+.bad{color:var(--signal);font-weight:600}
+dl{margin:0;display:grid;grid-template-columns:auto 1fr;gap:4px 12px;font-size:15px}
+dt{color:var(--slate)} dd{margin:0}
+.words{margin:6px 0 0;padding:0;list-style:none;font-family:var(--text);font-size:15px}
+.err{color:var(--signal);font-weight:600;font-size:15px}
+
+@media (max-width:900px){
+  body{grid-template-columns:1fr}
+  aside{position:static;max-height:none;border-left:0;border-top:2px solid var(--line)}
+  .stage{min-height:auto}
+}
+</style>
+</head>
+<body>
+<main class="stage">
+  <header>
+    <h1>Sprechstunde</h1>
+    <p class="tag">Talk with a German teacher out loud. Start from your first Hallo and work towards the Goethe-Zertifikat.</p>
+  </header>
+
+  <section class="controls" aria-label="Session settings">
+    <div class="field">Level
+      <div class="seg" id="levels" role="group" aria-label="Level">
+        <button aria-pressed="true" data-v="A1">A1</button>
+        <button aria-pressed="false" data-v="A2">A2</button>
+        <button aria-pressed="false" data-v="B1">B1</button>
+        <button aria-pressed="false" data-v="B2">B2</button>
+      </div>
+    </div>
+    <label class="field">Practice
+      <select id="mode">
+        <option value="lesson">Lesson</option>
+        <option value="speaking_exam">Sprechen mock exam</option>
+        <option value="listening">Hören practice</option>
+        <option value="writing">Schreiben practice</option>
+      </select>
+    </label>
+    <label class="field">I will speak
+      <select id="stt">
+        <option value="auto">English and German</option>
+        <option value="en">English only</option>
+        <option value="de">German only</option>
+      </select>
+    </label>
+    <label class="field">Mic sensitivity
+      <input type="range" id="sens" min="0.008" max="0.06" step="0.002" value="0.02">
+    </label>
+    <button class="go" id="go">Start</button>
+    <button class="seg" id="mute" style="padding:8px 16px;background:transparent;cursor:pointer;font-weight:600" hidden>Mute mic</button>
+  </section>
+
+  <section class="orbwrap" aria-live="polite">
+    <div class="orb" id="orb" data-mode="idle"></div>
+    <div>
+      <div class="status" id="status">Press Start and say Hallo.</div>
+      <div class="sub" id="sub">Use headphones for the best result. You can talk over the teacher to interrupt.</div>
+    </div>
+  </section>
+
+  <section class="caption" aria-live="polite">
+    <p class="say" id="say"></p>
+    <p class="you" id="you"></p>
+  </section>
+</main>
+
+<aside>
+  <section>
+    <h2>Conversation</h2>
+    <div class="log" id="log"><div class="empty">Your conversation will appear here.</div></div>
+  </section>
+  <section id="pron" hidden>
+    <h2>Pronunciation check</h2>
+    <div class="card" id="pronbody"></div>
+  </section>
+  <section>
+    <h2>Type instead</h2>
+    <form class="type" id="typeform">
+      <input id="typed" autocomplete="off" placeholder="Type in English or German">
+      <button>Send</button>
+    </form>
+  </section>
+  <section>
+    <h2>Progress</h2>
+    <dl id="prog"><dt>Level</dt><dd>-</dd></dl>
+  </section>
+</aside>
+
+<script>
+const $ = s => document.querySelector(s);
+const S = {
+  ws:null, ctx:null, stream:null, proc:null,
+  level:'A1', playing:null, queue:[], pending:null,
+  ignore:false, turnDone:true, rec:false, chunks:[], pre:[],
+  speechMs:0, silenceMs:0, recMs:0, muted:false, live:false
+};
+
+/* ---------- UI helpers ---------- */
+const LABELS = {
+  idle:['Ready.','Say something, or type below.'],
+  listening:['Listening. Just talk.','Pause for a moment when you are done.'],
+  thinking:['One moment.',''],
+  speaking:['Speaking.','Talk over it to interrupt.']
+};
+function setMode(m){
+  $('#orb').dataset.mode = m;
+  $('#status').textContent = LABELS[m][0];
+  $('#sub').textContent = LABELS[m][1];
+}
+function addLog(who,text){
+  const log = $('#log');
+  const e = log.querySelector('.empty'); if(e) e.remove();
+  const d = document.createElement('div');
+  d.className = 'msg ' + who; d.textContent = text;
+  log.append(d); log.scrollTop = log.scrollHeight;
+}
+function toast(msg){ $('#status').innerHTML = ''; const s=document.createElement('span'); s.className='err'; s.textContent=msg; $('#status').append(s); }
+
+async function refreshProgress(){
+  try{
+    const p = await (await fetch('/api/progress')).json();
+    const dl = $('#prog'); dl.innerHTML = '';
+    const rows = [
+      ['Level', p.level + ', unit ' + (p.unit+1)],
+      ['Words saved', p.vocab_total],
+      ['Due for review', p.due],
+    ];
+    if(p.strengths.length) rows.push(['Strong', p.strengths.join(', ')]);
+    if(p.weaknesses.length) rows.push(['Work on', p.weaknesses.join(', ')]);
+    if(p.exams.length){ const x = p.exams[p.exams.length-1]; rows.push(['Last mock', x.level + ': ' + x.estimated_score + '/100']); }
+    for(const [k,v] of rows){
+      const a=document.createElement('dt'); a.textContent=k;
+      const b=document.createElement('dd'); b.textContent=v; dl.append(a,b);
+    }
+  }catch(e){}
+}
+
+function showPron(m){
+  $('#pron').hidden = false;
+  const box = $('#pronbody'); box.innerHTML = '';
+  const t = document.createElement('div'); t.textContent = m.target; t.style.fontFamily='var(--text)';
+  const sc = document.createElement('div'); sc.innerHTML = '<b></b> / 100 overall'; sc.querySelector('b').textContent = Math.round(m.overall ?? 0);
+  box.append(t, sc);
+  if(m.weak_words && m.weak_words.length){
+    const ul = document.createElement('ul'); ul.className='words';
+    for(const w of m.weak_words){
+      const li = document.createElement('li');
+      li.innerHTML = '<span class="bad"></span> <span></span>';
+      li.children[0].textContent = w.word;
+      li.children[1].textContent = w.issue && w.issue !== 'None' ? w.issue : Math.round(w.score) + '/100';
+      ul.append(li);
+    }
+    box.append(ul);
+  } else { const ok=document.createElement('div'); ok.style.color='var(--ok)'; ok.textContent='Every word was clear.'; box.append(ok); }
+}
+
+/* ---------- audio out ---------- */
+function enqueue(item){ S.queue.push(item); if(!S.playing) playNext(); }
+function playNext(){
+  const item = S.queue.shift();
+  if(!item){ S.playing = null; if(S.turnDone && S.live) setMode('listening'); return; }
+  S.playing = item;
+  $('#say').textContent = item.text;
+  setMode('speaking');
+  if(!item.blob){ setTimeout(playNext, 1800); return; }
+  item.url = URL.createObjectURL(item.blob);
+  item.audio = new Audio(item.url);
+  const next = () => { URL.revokeObjectURL(item.url); if(S.playing === item) playNext(); };
+  item.audio.onended = next; item.audio.onerror = next;
+  item.audio.play().catch(next);
+}
+function stopPlayback(){
+  if(S.playing && S.playing.audio){ S.playing.audio.onended = S.playing.audio.onerror = null; S.playing.audio.pause(); URL.revokeObjectURL(S.playing.url); }
+  S.playing = null; S.queue = []; S.pending = null;
+}
+function bargeIn(){
+  stopPlayback(); S.ignore = true; S.turnDone = false;
+  if(S.ws && S.ws.readyState === 1) S.ws.send(JSON.stringify({type:'interrupt'}));
+}
+
+/* ---------- mic + simple voice activity detection ---------- */
+async function startMic(){
+  S.stream = await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:true,autoGainControl:true,channelCount:1}});
+  S.ctx = new (window.AudioContext || window.webkitAudioContext)();
+  const src = S.ctx.createMediaStreamSource(S.stream);
+  S.proc = S.ctx.createScriptProcessor(4096,1,1);
+  const sink = S.ctx.createGain(); sink.gain.value = 0;
+  src.connect(S.proc); S.proc.connect(sink); sink.connect(S.ctx.destination);
+  S.proc.onaudioprocess = e => onFrame(new Float32Array(e.inputBuffer.getChannelData(0)));
+}
+function onFrame(buf){
+  if(S.muted || !S.live) return;
+  const ms = buf.length / S.ctx.sampleRate * 1000;
+  let sum = 0; for(let i=0;i<buf.length;i++) sum += buf[i]*buf[i];
+  const rms = Math.sqrt(sum / buf.length);
+  const tutorTalking = !!S.playing;
+  if(!tutorTalking && S.turnDone && !S.rec) $('#orb').style.setProperty('--lvl', Math.min(1, rms*10));
+  const thr = parseFloat($('#sens').value) * (tutorTalking ? 2.2 : 1);
+
+  if(rms > thr){
+    S.speechMs += ms; S.silenceMs = 0;
+    if(!S.rec && S.speechMs > 150){
+      S.rec = true; S.recMs = 0; S.chunks = [...S.pre];
+      if(tutorTalking || !S.turnDone) bargeIn();
+      setMode('listening');
+    }
+  } else if(!S.rec){ S.speechMs = 0; }
+  else { S.silenceMs += ms; }
+
+  if(S.rec){
+    S.chunks.push(buf); S.recMs += ms;
+    if(S.silenceMs > 900 || S.recMs > 50000) finishUtterance();
+  } else { S.pre.push(buf); if(S.pre.length > 3) S.pre.shift(); }
+}
+function finishUtterance(){
+  const chunks = S.chunks; S.chunks = []; S.pre = [];
+  S.rec = false; S.silenceMs = 0; S.speechMs = 0;
+  const total = chunks.reduce((n,c)=>n+c.length,0);
+  if(total / S.ctx.sampleRate < 0.5) return;           // ignore clicks and coughs
+  const all = new Float32Array(total); let o = 0;
+  for(const c of chunks){ all.set(c,o); o += c.length; }
+  S.ignore = true; S.turnDone = false;
+  setMode('thinking');
+  S.ws.send(toWav(downsample(all, S.ctx.sampleRate, 16000), 16000));
+}
+function downsample(buf, from, to){
+  if(from === to) return buf;
+  const r = from/to, n = Math.floor(buf.length/r), out = new Float32Array(n);
+  for(let i=0;i<n;i++){
+    const s = Math.floor(i*r), e = Math.min(buf.length, Math.floor((i+1)*r)); let t = 0;
+    for(let j=s;j<e;j++) t += buf[j];
+    out[i] = t / (e-s || 1);
+  }
+  return out;
+}
+function toWav(f32, sr){
+  const b = new ArrayBuffer(44 + f32.length*2), v = new DataView(b);
+  const w = (o,s)=>{ for(let i=0;i<s.length;i++) v.setUint8(o+i, s.charCodeAt(i)); };
+  w(0,'RIFF'); v.setUint32(4,36+f32.length*2,true); w(8,'WAVE'); w(12,'fmt ');
+  v.setUint32(16,16,true); v.setUint16(20,1,true); v.setUint16(22,1,true);
+  v.setUint32(24,sr,true); v.setUint32(28,sr*2,true); v.setUint16(32,2,true); v.setUint16(34,16,true);
+  w(36,'data'); v.setUint32(40,f32.length*2,true);
+  let o = 44;
+  for(let i=0;i<f32.length;i++,o+=2){ const s = Math.max(-1,Math.min(1,f32[i])); v.setInt16(o, s<0 ? s*0x8000 : s*0x7FFF, true); }
+  return b;
+}
+
+/* ---------- session ---------- */
+function connect(){
+  const proto = location.protocol === 'https:' ? 'wss' : 'ws';
+  S.ws = new WebSocket(`${proto}://${location.host}/ws`);
+  S.ws.onopen = () => S.ws.send(JSON.stringify({type:'start', level:S.level, mode:$('#mode').value, stt:$('#stt').value}));
+  S.ws.onclose = () => { if(S.live) end(); };
+  S.ws.onmessage = ev => {
+    if(typeof ev.data !== 'string'){
+      if(S.ignore || S.pending === null) return;
+      const text = S.pending; S.pending = null;
+      enqueue({text, blob: ev.data.slice(0, ev.data.size, 'audio/mpeg')});
+      return;
+    }
+    const m = JSON.parse(ev.data);
+    switch(m.type){
+      case 'turn_start': S.ignore = false; S.turnDone = false; S.pending = null; setMode('thinking'); break;
+      case 'say': if(S.ignore) break; S.pending = m.text; addLog('tutor', m.text); break;
+      case 'say_failed': if(S.pending !== null){ enqueue({text:S.pending, blob:null}); S.pending = null; } break;
+      case 'transcript': addLog('you', m.text); $('#you').textContent = m.text; break;
+      case 'pronunciation': showPron(m); break;
+      case 'state': if(m.value === 'idle'){ S.turnDone = true; S.ignore = false; setMode('listening'); } break;
+      case 'turn_done': S.turnDone = true; if(!S.playing) setMode('listening'); refreshProgress(); break;
+      case 'error': S.turnDone = true; toast(m.message); break;
+    }
+  };
+}
+async function begin(){
+  try{ await startMic(); }catch(e){ toast('Microphone blocked. Allow access and press Start again.'); return; }
+  S.live = true; S.turnDone = false; S.ignore = false;
+  $('#go').textContent = 'End session'; $('#go').dataset.live = 'true'; $('#mute').hidden = false;
+  setMode('thinking'); connect();
+}
+function end(){
+  S.live = false; stopPlayback();
+  if(S.ws){ S.ws.onclose = null; S.ws.close(); }
+  if(S.stream) S.stream.getTracks().forEach(t => t.stop());
+  if(S.ctx) S.ctx.close();
+  $('#go').textContent = 'Start'; $('#go').dataset.live = 'false'; $('#mute').hidden = true;
+  setMode('idle'); $('#status').textContent = 'Session ended. Press Start to continue.';
+  refreshProgress();
+}
+
+$('#go').onclick = () => S.live ? end() : begin();
+$('#mute').onclick = () => { S.muted = !S.muted; $('#mute').textContent = S.muted ? 'Unmute mic' : 'Mute mic'; };
+$('#levels').onclick = e => {
+  const b = e.target.closest('button'); if(!b) return;
+  S.level = b.dataset.v;
+  document.querySelectorAll('#levels button').forEach(x => x.setAttribute('aria-pressed', x === b));
+};
+$('#stt').onchange = () => { if(S.ws && S.ws.readyState === 1) S.ws.send(JSON.stringify({type:'stt', value:$('#stt').value})); };
+$('#typeform').onsubmit = e => {
+  e.preventDefault();
+  const t = $('#typed').value.trim();
+  if(!t || !S.live || !S.ws || S.ws.readyState !== 1) return;
+  stopPlayback(); S.ignore = true; S.turnDone = false;
+  addLog('you', t); $('#you').textContent = t; $('#typed').value = '';
+  S.ws.send(JSON.stringify({type:'text', text:t}));
+};
+refreshProgress();
+</script>
+</body>
+</html>
